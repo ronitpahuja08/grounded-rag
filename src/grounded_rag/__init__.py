@@ -8,12 +8,22 @@ from grounded_rag.models import (
     RetrievalHit,
     SourceDocument,
 )
+from grounded_rag.protocols import (
+    AnswerGenerator,
+    DocumentLoader,
+    EmbeddingProvider,
+    EmbeddingVector,
+)
 from grounded_rag.settings import AppSettings
 
 __all__ = [
+    "AnswerGenerator",
     "AppSettings",
     "Chunk",
     "Citation",
+    "DocumentLoader",
+    "EmbeddingProvider",
+    "EmbeddingVector",
     "GroundedAnswer",
     "RetrievalHit",
     "SourceDocument",

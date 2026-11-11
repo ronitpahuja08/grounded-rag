@@ -36,6 +36,9 @@ question -> query embedding -> retrieval -> reranking -> grounded generation
 The retrieval and generation boundaries will use small Python protocols so the
 core pipeline can be tested with deterministic fakes instead of network calls.
 
+The complete user workflows, requirements, success measures, and version
+boundaries are defined in [docs/product-scope.md](docs/product-scope.md).
+
 ## Repository layout
 
 ```text

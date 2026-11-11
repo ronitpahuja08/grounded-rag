@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from grounded_rag import Chunk, RetrievalHit, SourceDocument
+from grounded_rag import Chunk, Citation, GroundedAnswer, RetrievalHit, SourceDocument
 
 
 def test_source_document_preserves_traceable_content() -> None:
@@ -116,3 +116,78 @@ def test_retrieval_hit_rejects_invalid_scores(score: float) -> None:
 def test_retrieval_hit_rejects_non_positive_rank() -> None:
     with pytest.raises(ValidationError):
         RetrievalHit(chunk=make_chunk(), score=0.5, rank=0)
+
+
+def make_citation(index: int = 1) -> Citation:
+    """Create a traceable citation for answer model tests."""
+    return Citation(
+        index=index,
+        chunk_id="guide:introduction:0",
+        document_id="guide:introduction",
+        source="docs/introduction.md",
+        quote="Grounded answers cite their evidence.",
+        start_char=16,
+        end_char=53,
+    )
+
+
+def test_grounded_answer_requires_ordered_citations() -> None:
+    answer = GroundedAnswer(
+        answer="Grounded answers point to supporting passages [1].",
+        status="grounded",
+        citations=(make_citation(),),
+    )
+
+    assert answer.citations[0].source == "docs/introduction.md"
+
+
+def test_insufficient_evidence_answer_is_explicit_and_citation_free() -> None:
+    answer = GroundedAnswer(
+        answer="The available sources do not contain enough evidence.",
+        status="insufficient_evidence",
+    )
+
+    assert answer.citations == ()
+
+
+@pytest.mark.parametrize(
+    ("status", "citations"),
+    [
+        ("grounded", ()),
+        ("insufficient_evidence", (make_citation(),)),
+    ],
+)
+def test_grounded_answer_rejects_status_citation_mismatches(
+    status: str,
+    citations: tuple[Citation, ...],
+) -> None:
+    with pytest.raises(ValidationError):
+        GroundedAnswer.model_validate(
+            {
+                "answer": "A response",
+                "status": status,
+                "citations": citations,
+            }
+        )
+
+
+def test_grounded_answer_rejects_non_contiguous_citation_indexes() -> None:
+    with pytest.raises(ValidationError):
+        GroundedAnswer(
+            answer="A response with a malformed citation sequence.",
+            status="grounded",
+            citations=(make_citation(index=2),),
+        )
+
+
+def test_citation_rejects_invalid_source_range() -> None:
+    with pytest.raises(ValidationError):
+        Citation(
+            index=1,
+            chunk_id="notes:0",
+            document_id="notes",
+            source="notes.txt",
+            quote="Text",
+            start_char=4,
+            end_char=4,
+        )

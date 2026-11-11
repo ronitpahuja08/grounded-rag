@@ -7,8 +7,10 @@ from grounded_rag.models import (
     RetrievalHit,
     SourceDocument,
 )
+from grounded_rag.settings import AppSettings
 
 __all__ = [
+    "AppSettings",
     "Chunk",
     "Citation",
     "GroundedAnswer",

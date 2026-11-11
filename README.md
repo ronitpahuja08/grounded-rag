@@ -50,13 +50,54 @@ ROADMAP.md          Eight-day build plan and acceptance criteria
 
 ## Development
 
-Python 3.11 or newer will be required. Day 1 establishes the install, test,
-lint, and type-check commands before feature implementation begins. Provider
-credentials will be read from environment variables; no keys or private
-documents belong in Git.
+Python 3.11 or newer is required. Create an isolated environment and install the
+package with its development tools:
+
+```bash
+python -m venv .venv
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+Activate the environment using `.venv/Scripts/Activate.ps1` on PowerShell or
+`source .venv/bin/activate` on macOS and Linux before running project commands.
+
+Copy `.env.example` to `.env` when overriding defaults. The local providers do
+not need credentials. `GROUNDED_RAG_OPENAI_API_KEY` is required only when the
+embedding or generation provider is explicitly set to `openai`; `.env` is
+ignored by Git.
+
+Run the complete Day 1 verification suite with:
+
+```bash
+pytest
+ruff check .
+mypy
+python -m build
+```
+
+These checks are offline and deterministic. They cover package installation,
+domain validation, environment configuration, stable hashing, and structural
+provider contracts. Generated distributions are written to `dist/` and are
+ignored by Git.
+
+## Foundation API
+
+Day 1 exposes the contracts later pipeline stages build on:
+
+- `SourceDocument`, `Chunk`, and `RetrievalHit` preserve traceable evidence.
+- `Citation` and `GroundedAnswer` prevent unsupported public responses.
+- `AppSettings` validates environment-driven runtime configuration.
+- `hash_text`, `hash_bytes`, and `hash_parts` create deterministic identities.
+- `DocumentLoader`, `EmbeddingProvider`, and `AnswerGenerator` isolate external
+  implementations behind typed interfaces.
+
+The reasoning behind these choices and the dependency direction are recorded
+in [docs/architecture.md](docs/architecture.md).
 
 ## Status
 
-Planning is complete for an eight-day, 80-commit build. Implementation begins
-only after the plan is reviewed; the full scope and daily acceptance criteria
-are documented in [ROADMAP.md](ROADMAP.md).
+Day 1 establishes the tested foundation, data contracts, configuration, and
+provider boundaries. The remaining ingestion, retrieval, generation,
+evaluation, API, and demo milestones are documented in
+[ROADMAP.md](ROADMAP.md).

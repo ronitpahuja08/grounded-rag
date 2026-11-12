@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Final
 
 import pytest
 
@@ -11,6 +12,8 @@ from grounded_rag import (
     EmptyTextSourceError,
     LoaderRegistry,
     MarkdownLoader,
+    PdfLoader,
+    PdfLoadingError,
     SourceDocument,
     TextDecodingError,
     TextLoader,
@@ -205,3 +208,98 @@ def test_markdown_loader_rejects_invalid_utf8(tmp_path: Path) -> None:
 
     with pytest.raises(TextDecodingError, match="Markdown source"):
         MarkdownLoader().load(source)
+
+
+_PDF_HEADER: Final = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
+
+
+def _write_text_pdf(source: Path) -> None:
+    """Write a minimal two-page PDF with deterministic text and metadata."""
+    streams = (
+        b"BT /F1 12 Tf 72 720 Td (First page evidence) Tj ET",
+        b"BT /F1 12 Tf 72 720 Td (Second page findings) Tj ET",
+    )
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 6 0 R >>"
+        ),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"
+        ),
+        b"<< /Length "
+        + str(len(streams[0])).encode()
+        + b" >>\nstream\n"
+        + streams[0]
+        + b"\nendstream",
+        b"<< /Length "
+        + str(len(streams[1])).encode()
+        + b" >>\nstream\n"
+        + streams[1]
+        + b"\nendstream",
+        b"<< /Title (Fixture Guide) >>",
+    ]
+    payload = bytearray(_PDF_HEADER)
+    offsets = [0]
+    for object_number, body in enumerate(objects, start=1):
+        offsets.append(len(payload))
+        payload.extend(f"{object_number} 0 obj\n".encode())
+        payload.extend(body)
+        payload.extend(b"\nendobj\n")
+
+    xref_offset = len(payload)
+    payload.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    payload.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        payload.extend(f"{offset:010d} 00000 n \n".encode())
+    payload.extend(
+        (
+            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R /Info 8 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF\n"
+        ).encode()
+    )
+    source.write_bytes(payload)
+
+
+def test_pdf_loader_returns_page_documents_with_provenance(tmp_path: Path) -> None:
+    source = tmp_path / "guide.pdf"
+    _write_text_pdf(source)
+
+    documents = LoaderRegistry((PdfLoader(),)).load(source)
+
+    assert [document.content for document in documents] == [
+        "First page evidence",
+        "Second page findings",
+    ]
+    assert [document.id.rsplit(":", 1)[1] for document in documents] == [
+        "page-1",
+        "page-2",
+    ]
+    assert all(document.media_type == "application/pdf" for document in documents)
+    assert all(document.title == "Fixture Guide" for document in documents)
+    assert [document.metadata["page"] for document in documents] == [1, 2]
+    assert all(document.metadata["page_count"] == 2 for document in documents)
+    assert all(
+        document.metadata["location"] == source.resolve().as_posix()
+        for document in documents
+    )
+
+
+def test_pdf_loader_supports_extension_case_insensitively() -> None:
+    loader = PdfLoader()
+
+    assert loader.supports(Path("guide.pdf"))
+    assert loader.supports(Path("GUIDE.PDF"))
+    assert not loader.supports(Path("guide.md"))
+
+
+def test_pdf_loader_rejects_invalid_pdf(tmp_path: Path) -> None:
+    source = tmp_path / "broken.pdf"
+    source.write_bytes(b"not a PDF")
+
+    with pytest.raises(PdfLoadingError, match="unable to read PDF"):
+        PdfLoader().load(source)

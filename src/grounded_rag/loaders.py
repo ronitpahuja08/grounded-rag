@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import TypedDict, cast
 
 from pydantic import JsonValue
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from grounded_rag.hashing import hash_text, normalize_text
 from grounded_rag.models import SourceDocument
@@ -34,6 +36,10 @@ class TextDecodingError(ValueError):
 
 class EmptyTextSourceError(ValueError):
     """Raised when a text source contains no readable content."""
+
+
+class PdfLoadingError(ValueError):
+    """Raised when a PDF cannot be opened or its text cannot be extracted."""
 
 
 class TextLoader:
@@ -181,6 +187,64 @@ def _extract_markdown_headings(content: str) -> list[HeadingMetadata]:
                 )
 
     return headings
+
+
+class PdfLoader:
+    """Load each readable PDF page as an independently traceable document."""
+
+    def supports(self, source: Path) -> bool:
+        """Return whether the source uses the PDF extension."""
+        return source.suffix.lower() == ".pdf"
+
+    def load(self, source: Path) -> tuple[SourceDocument, ...]:
+        """Extract page text and retain one-based PDF page metadata."""
+        resolved_source = source.resolve()
+        try:
+            reader = PdfReader(resolved_source)
+        except (OSError, PdfReadError) as error:
+            msg = f"unable to read PDF source: {source}"
+            raise PdfLoadingError(msg) from error
+
+        if reader.is_encrypted:
+            msg = f"encrypted PDF sources are not supported: {source}"
+            raise PdfLoadingError(msg)
+
+        location = resolved_source.as_posix()
+        source_id = hash_text(location)[:32]
+        page_count = len(reader.pages)
+        raw_title = reader.metadata.title if reader.metadata is not None else None
+        title = raw_title.strip() if raw_title and raw_title.strip() else source.stem
+        documents: list[SourceDocument] = []
+
+        for page_number, page in enumerate(reader.pages, start=1):
+            try:
+                content = normalize_text(page.extract_text() or "")
+            except (KeyError, PdfReadError, TypeError, ValueError) as error:
+                msg = f"unable to extract page {page_number} from PDF source: {source}"
+                raise PdfLoadingError(msg) from error
+
+            if not content.strip():
+                continue
+
+            documents.append(
+                SourceDocument(
+                    id=f"pdf:{source_id}:page-{page_number}",
+                    content=content,
+                    source=location,
+                    media_type="application/pdf",
+                    title=title,
+                    metadata={
+                        "location": location,
+                        "page": page_number,
+                        "page_count": page_count,
+                    },
+                )
+            )
+
+        if not documents:
+            msg = f"PDF source contains no extractable text: {source}"
+            raise EmptyTextSourceError(msg)
+        return tuple(documents)
 
 
 class LoaderRegistry:

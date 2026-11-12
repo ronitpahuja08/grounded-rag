@@ -9,8 +9,9 @@ from pydantic import JsonValue
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from grounded_rag.hashing import hash_text, normalize_text
+from grounded_rag.hashing import hash_text
 from grounded_rag.models import SourceDocument
+from grounded_rag.normalization import normalize_document_text
 from grounded_rag.protocols import DocumentLoader
 
 
@@ -53,7 +54,9 @@ class TextLoader:
         """Decode a text file strictly as UTF-8 and preserve its location."""
         resolved_source = source.resolve()
         try:
-            content = normalize_text(resolved_source.read_text(encoding="utf-8"))
+            content = normalize_document_text(
+                resolved_source.read_text(encoding="utf-8")
+            )
         except UnicodeDecodeError as error:
             msg = f"text source is not valid UTF-8: {source}"
             raise TextDecodingError(msg) from error
@@ -102,7 +105,9 @@ class MarkdownLoader:
         """Decode Markdown as UTF-8 and record headings with line locations."""
         resolved_source = source.resolve()
         try:
-            content = normalize_text(resolved_source.read_text(encoding="utf-8"))
+            content = normalize_document_text(
+                resolved_source.read_text(encoding="utf-8")
+            )
         except UnicodeDecodeError as error:
             msg = f"Markdown source is not valid UTF-8: {source}"
             raise TextDecodingError(msg) from error
@@ -218,7 +223,7 @@ class PdfLoader:
 
         for page_number, page in enumerate(reader.pages, start=1):
             try:
-                content = normalize_text(page.extract_text() or "")
+                content = normalize_document_text(page.extract_text() or "")
             except (KeyError, PdfReadError, TypeError, ValueError) as error:
                 msg = f"unable to extract page {page_number} from PDF source: {source}"
                 raise PdfLoadingError(msg) from error

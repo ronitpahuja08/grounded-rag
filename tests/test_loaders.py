@@ -272,8 +272,8 @@ def test_pdf_loader_returns_page_documents_with_provenance(tmp_path: Path) -> No
     documents = LoaderRegistry((PdfLoader(),)).load(source)
 
     assert [document.content for document in documents] == [
-        "First page evidence",
-        "Second page findings",
+        "First page evidence\n",
+        "Second page findings\n",
     ]
     assert [document.id.rsplit(":", 1)[1] for document in documents] == [
         "page-1",

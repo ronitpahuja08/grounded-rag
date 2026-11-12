@@ -21,6 +21,7 @@ from grounded_rag.models import (
     RetrievalHit,
     SourceDocument,
 )
+from grounded_rag.normalization import normalize_document_text
 from grounded_rag.protocols import (
     AnswerGenerator,
     DocumentLoader,
@@ -55,6 +56,7 @@ __all__ = [
     "hash_bytes",
     "hash_parts",
     "hash_text",
+    "normalize_document_text",
     "normalize_text",
 ]
 

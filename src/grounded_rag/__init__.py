@@ -4,8 +4,11 @@ from grounded_rag.hashing import hash_bytes, hash_parts, hash_text, normalize_te
 from grounded_rag.loaders import (
     AmbiguousLoaderError,
     EmptyLoaderResultError,
+    EmptyTextSourceError,
     LoaderDispatchError,
     LoaderRegistry,
+    TextDecodingError,
+    TextLoader,
     UnsupportedSourceError,
 )
 from grounded_rag.models import (
@@ -33,11 +36,14 @@ __all__ = [
     "EmbeddingProvider",
     "EmbeddingVector",
     "EmptyLoaderResultError",
+    "EmptyTextSourceError",
     "GroundedAnswer",
     "LoaderDispatchError",
     "LoaderRegistry",
     "RetrievalHit",
     "SourceDocument",
+    "TextDecodingError",
+    "TextLoader",
     "UnsupportedSourceError",
     "__version__",
     "hash_bytes",

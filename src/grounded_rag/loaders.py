@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from pathlib import Path
 
+from grounded_rag.hashing import hash_text, normalize_text
 from grounded_rag.models import SourceDocument
 from grounded_rag.protocols import DocumentLoader
 
@@ -21,6 +22,48 @@ class AmbiguousLoaderError(LoaderDispatchError):
 
 class EmptyLoaderResultError(LoaderDispatchError):
     """Raised when a loader accepts a source but returns no documents."""
+
+
+class TextDecodingError(ValueError):
+    """Raised when a text source is not valid UTF-8."""
+
+
+class EmptyTextSourceError(ValueError):
+    """Raised when a text source contains no readable content."""
+
+
+class TextLoader:
+    """Load UTF-8 ``.txt`` files into one traceable source document."""
+
+    def supports(self, source: Path) -> bool:
+        """Return whether the source uses the plain-text file extension."""
+        return source.suffix.lower() == ".txt"
+
+    def load(self, source: Path) -> tuple[SourceDocument, ...]:
+        """Decode a text file strictly as UTF-8 and preserve its location."""
+        resolved_source = source.resolve()
+        try:
+            content = normalize_text(resolved_source.read_text(encoding="utf-8"))
+        except UnicodeDecodeError as error:
+            msg = f"text source is not valid UTF-8: {source}"
+            raise TextDecodingError(msg) from error
+
+        if not content.strip():
+            msg = f"text source contains no readable content: {source}"
+            raise EmptyTextSourceError(msg)
+
+        location = resolved_source.as_posix()
+        document_id = f"text:{hash_text(location)[:32]}"
+        return (
+            SourceDocument(
+                id=document_id,
+                content=content,
+                source=location,
+                media_type="text/plain",
+                title=source.stem,
+                metadata={"encoding": "utf-8", "location": location},
+            ),
+        )
 
 
 class LoaderRegistry:

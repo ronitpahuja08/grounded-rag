@@ -13,6 +13,7 @@ from grounded_rag.hashing import hash_text
 from grounded_rag.models import SourceDocument
 from grounded_rag.normalization import normalize_document_text
 from grounded_rag.protocols import DocumentLoader
+from grounded_rag.provenance import source_provenance
 
 
 class LoaderDispatchError(ValueError):
@@ -74,7 +75,11 @@ class TextLoader:
                 source=location,
                 media_type="text/plain",
                 title=source.stem,
-                metadata={"encoding": "utf-8", "location": location},
+                metadata={
+                    **source_provenance(resolved_source, content),
+                    "encoding": "utf-8",
+                    "location": location,
+                },
             ),
         )
 
@@ -136,6 +141,7 @@ class MarkdownLoader:
                 media_type="text/markdown",
                 title=title,
                 metadata={
+                    **source_provenance(resolved_source, content),
                     "encoding": "utf-8",
                     "headings": heading_metadata,
                     "location": location,
@@ -239,6 +245,7 @@ class PdfLoader:
                     media_type="application/pdf",
                     title=title,
                     metadata={
+                        **source_provenance(resolved_source, content),
                         "location": location,
                         "page": page_number,
                         "page_count": page_count,

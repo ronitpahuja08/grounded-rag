@@ -1,5 +1,6 @@
 """Tests for loader registration and file dispatch."""
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
@@ -18,6 +19,8 @@ from grounded_rag import (
     TextDecodingError,
     TextLoader,
     UnsupportedSourceError,
+    hash_bytes,
+    hash_text,
 )
 
 
@@ -98,6 +101,8 @@ def test_text_loader_reads_utf8_content_with_traceable_metadata(
 ) -> None:
     source = tmp_path / "Café notes.txt"
     source.write_bytes("First line\r\nCafé evidence\r".encode())
+    modified_ns = 1_700_000_000_123_456_000
+    os.utime(source, ns=(modified_ns, modified_ns))
 
     (document,) = LoaderRegistry((TextLoader(),)).load(source)
 
@@ -105,10 +110,13 @@ def test_text_loader_reads_utf8_content_with_traceable_metadata(
     assert document.media_type == "text/plain"
     assert document.title == "Café notes"
     assert document.source == source.resolve().as_posix()
-    assert document.metadata == {
-        "encoding": "utf-8",
-        "location": source.resolve().as_posix(),
-    }
+    assert document.metadata["encoding"] == "utf-8"
+    assert document.metadata["location"] == source.resolve().as_posix()
+    assert document.metadata["source_hash"] == hash_bytes(source.read_bytes())
+    assert document.metadata["content_hash"] == hash_text(document.content)
+    assert document.metadata["source_modified_at"] == (
+        "2023-11-14T22:13:20.123456+00:00"
+    )
 
 
 def test_text_loader_identifier_is_stable_for_same_location(tmp_path: Path) -> None:
@@ -287,6 +295,9 @@ def test_pdf_loader_returns_page_documents_with_provenance(tmp_path: Path) -> No
         document.metadata["location"] == source.resolve().as_posix()
         for document in documents
     )
+    assert len({document.metadata["source_hash"] for document in documents}) == 1
+    assert len({document.metadata["content_hash"] for document in documents}) == 2
+    assert all("source_modified_at" in document.metadata for document in documents)
 
 
 def test_pdf_loader_supports_extension_case_insensitively() -> None:

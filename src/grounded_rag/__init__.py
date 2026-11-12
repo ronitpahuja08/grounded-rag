@@ -28,6 +28,7 @@ from grounded_rag.protocols import (
     EmbeddingProvider,
     EmbeddingVector,
 )
+from grounded_rag.provenance import source_provenance
 from grounded_rag.settings import AppSettings
 
 __all__ = [
@@ -58,6 +59,7 @@ __all__ = [
     "hash_text",
     "normalize_document_text",
     "normalize_text",
+    "source_provenance",
 ]
 
 __version__ = "0.1.0"

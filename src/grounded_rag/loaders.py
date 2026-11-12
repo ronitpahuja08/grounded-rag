@@ -32,12 +32,20 @@ class EmptyLoaderResultError(LoaderDispatchError):
     """Raised when a loader accepts a source but returns no documents."""
 
 
+class SourceTooLargeError(LoaderDispatchError):
+    """Raised when a source exceeds the configured ingestion limit."""
+
+
 class TextDecodingError(ValueError):
     """Raised when a text source is not valid UTF-8."""
 
 
 class EmptyTextSourceError(ValueError):
     """Raised when a text source contains no readable content."""
+
+
+class BinarySourceError(ValueError):
+    """Raised when a text loader detects binary content."""
 
 
 class PdfLoadingError(ValueError):
@@ -54,13 +62,7 @@ class TextLoader:
     def load(self, source: Path) -> tuple[SourceDocument, ...]:
         """Decode a text file strictly as UTF-8 and preserve its location."""
         resolved_source = source.resolve()
-        try:
-            content = normalize_document_text(
-                resolved_source.read_text(encoding="utf-8")
-            )
-        except UnicodeDecodeError as error:
-            msg = f"text source is not valid UTF-8: {source}"
-            raise TextDecodingError(msg) from error
+        content = _read_utf8_source(resolved_source, source, "text")
 
         if not content.strip():
             msg = f"text source contains no readable content: {source}"
@@ -109,13 +111,7 @@ class MarkdownLoader:
     def load(self, source: Path) -> tuple[SourceDocument, ...]:
         """Decode Markdown as UTF-8 and record headings with line locations."""
         resolved_source = source.resolve()
-        try:
-            content = normalize_document_text(
-                resolved_source.read_text(encoding="utf-8")
-            )
-        except UnicodeDecodeError as error:
-            msg = f"Markdown source is not valid UTF-8: {source}"
-            raise TextDecodingError(msg) from error
+        content = _read_utf8_source(resolved_source, source, "Markdown")
 
         if not content.strip():
             msg = f"Markdown source contains no readable content: {source}"
@@ -200,6 +196,20 @@ def _extract_markdown_headings(content: str) -> list[HeadingMetadata]:
     return headings
 
 
+def _read_utf8_source(resolved_source: Path, source: Path, label: str) -> str:
+    """Decode a source strictly after rejecting embedded null bytes."""
+    payload = resolved_source.read_bytes()
+    if b"\x00" in payload:
+        msg = f"{label} source appears to be binary: {source}"
+        raise BinarySourceError(msg)
+    try:
+        decoded = payload.decode("utf-8")
+    except UnicodeDecodeError as error:
+        msg = f"{label} source is not valid UTF-8: {source}"
+        raise TextDecodingError(msg) from error
+    return normalize_document_text(decoded)
+
+
 class PdfLoader:
     """Load each readable PDF page as an independently traceable document."""
 
@@ -262,13 +272,27 @@ class PdfLoader:
 class LoaderRegistry:
     """Resolve exactly one registered loader for each source file."""
 
-    def __init__(self, loaders: Iterable[DocumentLoader] = ()) -> None:
+    def __init__(
+        self,
+        loaders: Iterable[DocumentLoader] = (),
+        *,
+        max_source_bytes: int = 10 * 1024 * 1024,
+    ) -> None:
+        if isinstance(max_source_bytes, bool) or max_source_bytes <= 0:
+            msg = "max_source_bytes must be a positive integer"
+            raise ValueError(msg)
         self._loaders = list(loaders)
+        self._max_source_bytes = max_source_bytes
 
     @property
     def registered_count(self) -> int:
         """Return the number of available loader implementations."""
         return len(self._loaders)
+
+    @property
+    def max_source_bytes(self) -> int:
+        """Return the maximum file size accepted by this registry."""
+        return self._max_source_bytes
 
     def register(self, loader: DocumentLoader) -> None:
         """Append a loader to the registry's deterministic lookup order."""
@@ -295,6 +319,14 @@ class LoaderRegistry:
         if not path.is_file():
             msg = f"source file does not exist: {path}"
             raise FileNotFoundError(msg)
+
+        source_size = path.stat().st_size
+        if source_size > self._max_source_bytes:
+            msg = (
+                f"source is {source_size} bytes, exceeding the "
+                f"{self._max_source_bytes}-byte limit: {path}"
+            )
+            raise SourceTooLargeError(msg)
 
         documents = tuple(self.resolve(path).load(path))
         if not documents:

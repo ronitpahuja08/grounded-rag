@@ -3,6 +3,7 @@
 from grounded_rag.hashing import hash_bytes, hash_parts, hash_text, normalize_text
 from grounded_rag.loaders import (
     AmbiguousLoaderError,
+    BinarySourceError,
     EmptyLoaderResultError,
     EmptyTextSourceError,
     LoaderDispatchError,
@@ -10,6 +11,7 @@ from grounded_rag.loaders import (
     MarkdownLoader,
     PdfLoader,
     PdfLoadingError,
+    SourceTooLargeError,
     TextDecodingError,
     TextLoader,
     UnsupportedSourceError,
@@ -35,6 +37,7 @@ __all__ = [
     "AmbiguousLoaderError",
     "AnswerGenerator",
     "AppSettings",
+    "BinarySourceError",
     "Chunk",
     "Citation",
     "DocumentLoader",
@@ -50,6 +53,7 @@ __all__ = [
     "PdfLoadingError",
     "RetrievalHit",
     "SourceDocument",
+    "SourceTooLargeError",
     "TextDecodingError",
     "TextLoader",
     "UnsupportedSourceError",

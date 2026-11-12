@@ -29,6 +29,7 @@ def test_settings_use_safe_local_defaults() -> None:
     assert settings.embedding_provider == "local"
     assert settings.generation_provider == "local"
     assert settings.top_k == 5
+    assert settings.max_source_bytes == 10 * 1024 * 1024
     assert settings.openai_api_key is None
 
 
@@ -65,3 +66,10 @@ def test_settings_require_key_for_openai_provider() -> None:
 def test_settings_reject_overlap_that_consumes_entire_chunk() -> None:
     with pytest.raises(ValidationError, match="chunk_overlap"):
         IsolatedSettings(chunk_size=256, chunk_overlap=256)
+
+
+def test_settings_validate_configurable_source_size_limit() -> None:
+    assert IsolatedSettings(max_source_bytes=4096).max_source_bytes == 4096
+
+    with pytest.raises(ValidationError, match="max_source_bytes"):
+        IsolatedSettings(max_source_bytes=512)

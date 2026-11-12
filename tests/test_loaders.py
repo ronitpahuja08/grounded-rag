@@ -9,6 +9,7 @@ import pytest
 
 from grounded_rag import (
     AmbiguousLoaderError,
+    BinarySourceError,
     EmptyLoaderResultError,
     EmptyTextSourceError,
     LoaderRegistry,
@@ -16,6 +17,7 @@ from grounded_rag import (
     PdfLoader,
     PdfLoadingError,
     SourceDocument,
+    SourceTooLargeError,
     TextDecodingError,
     TextLoader,
     UnsupportedSourceError,
@@ -96,6 +98,29 @@ def test_registry_rejects_duplicate_loader_instance() -> None:
         registry.register(loader)
 
 
+def test_registry_rejects_sources_over_configured_size(tmp_path: Path) -> None:
+    source = tmp_path / "notes.txt"
+    source.write_bytes(b"123456")
+    registry = LoaderRegistry((TextLoader(),), max_source_bytes=5)
+
+    with pytest.raises(SourceTooLargeError, match=r"6 bytes.*5-byte limit"):
+        registry.load(source)
+
+
+def test_registry_accepts_source_at_exact_size_limit(tmp_path: Path) -> None:
+    source = tmp_path / "notes.txt"
+    source.write_bytes(b"12345")
+    registry = LoaderRegistry((TextLoader(),), max_source_bytes=5)
+
+    assert registry.load(source)[0].content == "12345\n"
+
+
+@pytest.mark.parametrize("limit", [0, -1, True])
+def test_registry_rejects_invalid_source_size_limit(limit: int) -> None:
+    with pytest.raises(ValueError, match="positive integer"):
+        LoaderRegistry(max_source_bytes=limit)
+
+
 def test_text_loader_reads_utf8_content_with_traceable_metadata(
     tmp_path: Path,
 ) -> None:
@@ -143,6 +168,14 @@ def test_text_loader_rejects_non_utf8_bytes(tmp_path: Path) -> None:
     source.write_bytes(b"\xff\xfeinvalid")
 
     with pytest.raises(TextDecodingError, match="valid UTF-8"):
+        TextLoader().load(source)
+
+
+def test_text_loader_rejects_binary_null_bytes(tmp_path: Path) -> None:
+    source = tmp_path / "binary.txt"
+    source.write_bytes(b"valid prefix\x00binary payload")
+
+    with pytest.raises(BinarySourceError, match="appears to be binary"):
         TextLoader().load(source)
 
 

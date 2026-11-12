@@ -15,6 +15,7 @@ ModelName = Annotated[
 ChunkSize = Annotated[int, Field(ge=128, le=8192)]
 ChunkOverlap = Annotated[int, Field(ge=0, le=2048)]
 TopK = Annotated[int, Field(ge=1, le=100)]
+SourceByteLimit = Annotated[int, Field(ge=1024, le=1_073_741_824)]
 RetrievalThreshold = Annotated[
     float,
     Field(ge=0.0, le=1.0, allow_inf_nan=False),
@@ -44,6 +45,7 @@ class AppSettings(BaseSettings):
     chunk_overlap: ChunkOverlap = 150
     top_k: TopK = 5
     minimum_retrieval_score: RetrievalThreshold = 0.2
+    max_source_bytes: SourceByteLimit = 10 * 1024 * 1024
 
     @model_validator(mode="after")
     def validate_pipeline_configuration(self) -> Self:

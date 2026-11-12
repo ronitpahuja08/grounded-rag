@@ -1,7 +1,11 @@
 """Document loader registration and deterministic file dispatch."""
 
+import re
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TypedDict, cast
+
+from pydantic import JsonValue
 
 from grounded_rag.hashing import hash_text, normalize_text
 from grounded_rag.models import SourceDocument
@@ -64,6 +68,119 @@ class TextLoader:
                 metadata={"encoding": "utf-8", "location": location},
             ),
         )
+
+
+_ATX_HEADING = re.compile(
+    r"^ {0,3}(?P<marks>#{1,6})[ \t]+(?P<text>.*?)[ \t]*#*[ \t]*$"
+)
+_SETEXT_HEADING = re.compile(r"^ {0,3}(?P<marks>=+|-+)[ \t]*$")
+_FENCE = re.compile(r"^ {0,3}(?P<marks>`{3,}|~{3,})")
+
+
+class HeadingMetadata(TypedDict):
+    """Serializable Markdown heading location."""
+
+    level: int
+    line: int
+    text: str
+
+
+class MarkdownLoader:
+    """Load Markdown while retaining an ordered heading outline."""
+
+    def supports(self, source: Path) -> bool:
+        """Return whether the source has a common Markdown extension."""
+        return source.suffix.lower() in {".md", ".markdown"}
+
+    def load(self, source: Path) -> tuple[SourceDocument, ...]:
+        """Decode Markdown as UTF-8 and record headings with line locations."""
+        resolved_source = source.resolve()
+        try:
+            content = normalize_text(resolved_source.read_text(encoding="utf-8"))
+        except UnicodeDecodeError as error:
+            msg = f"Markdown source is not valid UTF-8: {source}"
+            raise TextDecodingError(msg) from error
+
+        if not content.strip():
+            msg = f"Markdown source contains no readable content: {source}"
+            raise EmptyTextSourceError(msg)
+
+        headings = _extract_markdown_headings(content)
+        heading_metadata = cast(JsonValue, headings)
+        location = resolved_source.as_posix()
+        document_id = f"markdown:{hash_text(location)[:32]}"
+        title = next(
+            (
+                str(heading["text"])
+                for heading in headings
+                if heading["level"] == 1
+            ),
+            source.stem,
+        )
+        return (
+            SourceDocument(
+                id=document_id,
+                content=content,
+                source=location,
+                media_type="text/markdown",
+                title=title,
+                metadata={
+                    "encoding": "utf-8",
+                    "headings": heading_metadata,
+                    "location": location,
+                },
+            ),
+        )
+
+
+def _extract_markdown_headings(content: str) -> list[HeadingMetadata]:
+    """Return ATX and Setext headings outside fenced code blocks."""
+    headings: list[HeadingMetadata] = []
+    lines = content.splitlines()
+    fence_marker: str | None = None
+    fence_length = 0
+
+    for index, line in enumerate(lines):
+        fence = _FENCE.match(line)
+        if fence:
+            marks = fence.group("marks")
+            if fence_marker is None:
+                fence_marker = marks[0]
+                fence_length = len(marks)
+            elif marks[0] == fence_marker and len(marks) >= fence_length:
+                fence_marker = None
+                fence_length = 0
+            continue
+
+        if fence_marker is not None:
+            continue
+
+        atx = _ATX_HEADING.match(line)
+        if atx:
+            text = atx.group("text").strip()
+            if text:
+                headings.append(
+                    {
+                        "level": len(atx.group("marks")),
+                        "line": index + 1,
+                        "text": text,
+                    }
+                )
+            continue
+
+        setext = _SETEXT_HEADING.match(line)
+        if setext and index > 0:
+            text = lines[index - 1].strip()
+            if text:
+                headings.append(
+                    {
+                        "level": 1 if setext.group("marks")[0] == "=" else 2,
+                        "line": index,
+                        "text": text,
+                    }
+                )
+
+    return headings
 
 
 class LoaderRegistry:

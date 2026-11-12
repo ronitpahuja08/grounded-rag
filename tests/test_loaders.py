@@ -10,6 +10,7 @@ from grounded_rag import (
     EmptyLoaderResultError,
     EmptyTextSourceError,
     LoaderRegistry,
+    MarkdownLoader,
     SourceDocument,
     TextDecodingError,
     TextLoader,
@@ -140,3 +141,67 @@ def test_text_loader_rejects_whitespace_only_files(tmp_path: Path) -> None:
 
     with pytest.raises(EmptyTextSourceError, match="no readable content"):
         TextLoader().load(source)
+
+
+def test_markdown_loader_preserves_outline_and_source_metadata(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "guide.md"
+    source.write_text(
+        "# Grounded RAG\n\n"
+        "## Loading\n\n"
+        "```python\n# not a heading\n```\n\n"
+        "Evaluation\n----------\n",
+        encoding="utf-8",
+    )
+
+    (document,) = LoaderRegistry((MarkdownLoader(),)).load(source)
+
+    assert document.media_type == "text/markdown"
+    assert document.title == "Grounded RAG"
+    assert document.source == source.resolve().as_posix()
+    assert document.metadata["headings"] == [
+        {"level": 1, "line": 1, "text": "Grounded RAG"},
+        {"level": 2, "line": 3, "text": "Loading"},
+        {"level": 2, "line": 9, "text": "Evaluation"},
+    ]
+    assert document.metadata["location"] == source.resolve().as_posix()
+
+
+def test_markdown_loader_uses_setext_h1_as_title(tmp_path: Path) -> None:
+    source = tmp_path / "design.markdown"
+    source.write_text("Architecture\n============\n\nDetails\n", encoding="utf-8")
+
+    (document,) = MarkdownLoader().load(source)
+
+    assert document.title == "Architecture"
+    assert document.metadata["headings"] == [
+        {"level": 1, "line": 1, "text": "Architecture"}
+    ]
+
+
+def test_markdown_loader_falls_back_to_filename_without_h1(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "release-notes.md"
+    source.write_text("## Version 0.1\n\nInitial release.\n", encoding="utf-8")
+
+    (document,) = MarkdownLoader().load(source)
+
+    assert document.title == "release-notes"
+
+
+def test_markdown_loader_supports_common_extensions() -> None:
+    loader = MarkdownLoader()
+
+    assert loader.supports(Path("README.md"))
+    assert loader.supports(Path("GUIDE.MARKDOWN"))
+    assert not loader.supports(Path("notes.txt"))
+
+
+def test_markdown_loader_rejects_invalid_utf8(tmp_path: Path) -> None:
+    source = tmp_path / "legacy.md"
+    source.write_bytes(b"\xff\xfeinvalid")
+
+    with pytest.raises(TextDecodingError, match="Markdown source"):
+        MarkdownLoader().load(source)

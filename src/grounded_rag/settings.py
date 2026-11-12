@@ -6,6 +6,8 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, SecretStr, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from grounded_rag.discovery import DEFAULT_IGNORED_PATHS
+
 Environment = Literal["development", "test", "production"]
 ProviderName = Literal["local", "openai"]
 ModelName = Annotated[
@@ -46,6 +48,7 @@ class AppSettings(BaseSettings):
     top_k: TopK = 5
     minimum_retrieval_score: RetrievalThreshold = 0.2
     max_source_bytes: SourceByteLimit = 10 * 1024 * 1024
+    ignored_paths: tuple[str, ...] = DEFAULT_IGNORED_PATHS
 
     @model_validator(mode="after")
     def validate_pipeline_configuration(self) -> Self:

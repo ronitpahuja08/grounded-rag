@@ -1,5 +1,10 @@
 """Grounded RAG public package."""
 
+from grounded_rag.discovery import (
+    DEFAULT_IGNORED_PATHS,
+    discover_sources,
+    load_directory,
+)
 from grounded_rag.hashing import hash_bytes, hash_parts, hash_text, normalize_text
 from grounded_rag.loaders import (
     AmbiguousLoaderError,
@@ -34,6 +39,7 @@ from grounded_rag.provenance import source_provenance
 from grounded_rag.settings import AppSettings
 
 __all__ = [
+    "DEFAULT_IGNORED_PATHS",
     "AmbiguousLoaderError",
     "AnswerGenerator",
     "AppSettings",
@@ -58,9 +64,11 @@ __all__ = [
     "TextLoader",
     "UnsupportedSourceError",
     "__version__",
+    "discover_sources",
     "hash_bytes",
     "hash_parts",
     "hash_text",
+    "load_directory",
     "normalize_document_text",
     "normalize_text",
     "source_provenance",

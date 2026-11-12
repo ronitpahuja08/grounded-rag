@@ -30,6 +30,7 @@ def test_settings_use_safe_local_defaults() -> None:
     assert settings.generation_provider == "local"
     assert settings.top_k == 5
     assert settings.max_source_bytes == 10 * 1024 * 1024
+    assert ".git" in settings.ignored_paths
     assert settings.openai_api_key is None
 
 
@@ -73,3 +74,13 @@ def test_settings_validate_configurable_source_size_limit() -> None:
 
     with pytest.raises(ValidationError, match="max_source_bytes"):
         IsolatedSettings(max_source_bytes=512)
+
+
+def test_settings_load_ignored_paths_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GROUNDED_RAG_IGNORED_PATHS", '["private", "drafts/**"]')
+
+    settings = IsolatedSettings()
+
+    assert settings.ignored_paths == ("private", "drafts/**")

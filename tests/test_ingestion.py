@@ -3,9 +3,12 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from grounded_rag import (
     ChunkingConfig,
     LoaderRegistry,
+    TextDecodingError,
     TextLoader,
     ingest_directory,
     load_manifest,
@@ -81,3 +84,23 @@ def test_incremental_ingestion_tracks_change_addition_and_removal(
         added.resolve().as_posix(),
         changed.resolve().as_posix(),
     }
+
+
+def test_failed_incremental_run_does_not_replace_last_valid_manifest(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    source = sources / "guide.txt"
+    source.write_text("valid evidence", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    registry = LoaderRegistry((TextLoader(),))
+    config = ChunkingConfig(max_tokens=16, overlap_tokens=0)
+    ingest_directory(sources, registry, manifest_path, chunking=config)
+    valid_manifest = manifest_path.read_bytes()
+
+    source.write_bytes(b"\xff\xfeinvalid")
+
+    with pytest.raises(TextDecodingError):
+        ingest_directory(sources, registry, manifest_path, chunking=config)
+    assert manifest_path.read_bytes() == valid_manifest

@@ -67,7 +67,7 @@ not need credentials. `GROUNDED_RAG_OPENAI_API_KEY` is required only when the
 embedding or generation provider is explicitly set to `openai`; `.env` is
 ignored by Git.
 
-Run the complete Day 1 verification suite with:
+Run the complete verification suite with:
 
 ```bash
 pytest
@@ -77,13 +77,14 @@ python -m build
 ```
 
 These checks are offline and deterministic. They cover package installation,
-domain validation, environment configuration, stable hashing, and structural
-provider contracts. Generated distributions are written to `dist/` and are
-ignored by Git.
+domain validation, environment configuration, source loading, stable chunking,
+incremental corpus manifests, hashing, and structural provider contracts.
+Generated distributions are written to `dist/` and are ignored by Git.
 
-## Foundation API
+## Current API
 
-Day 1 exposes the contracts later pipeline stages build on:
+The first three milestones expose the contracts and ingestion lifecycle that
+later retrieval stages build on:
 
 - `SourceDocument`, `Chunk`, and `RetrievalHit` preserve traceable evidence.
 - `Citation` and `GroundedAnswer` prevent unsupported public responses.
@@ -91,13 +92,19 @@ Day 1 exposes the contracts later pipeline stages build on:
 - `hash_text`, `hash_bytes`, and `hash_parts` create deterministic identities.
 - `DocumentLoader`, `EmbeddingProvider`, and `AnswerGenerator` isolate external
   implementations behind typed interfaces.
+- `TextLoader`, `MarkdownLoader`, and `PdfLoader` normalize traceable sources.
+- `ChunkingConfig` and `chunk_document` produce overlapping, section-aware
+  retrieval units with stable identifiers.
+- `CorpusManifest` records exact source, document, and chunk identities.
+- `ingest_directory` rebuilds only added or changed sources and preserves the
+  last valid manifest if processing fails.
 
 The reasoning behind these choices and the dependency direction are recorded
 in [docs/architecture.md](docs/architecture.md).
 
 ## Status
 
-Day 1 establishes the tested foundation, data contracts, configuration, and
-provider boundaries. The remaining ingestion, retrieval, generation,
-evaluation, API, and demo milestones are documented in
+Days 1–3 are complete: foundation, file ingestion, normalization, chunking, and
+incremental corpus lifecycle. Embeddings, retrieval, grounded generation,
+evaluation, API, and demo milestones remain documented in
 [ROADMAP.md](ROADMAP.md).

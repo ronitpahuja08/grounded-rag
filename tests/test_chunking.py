@@ -155,3 +155,23 @@ def test_duplicate_chunk_content_keeps_first_provenance() -> None:
     unique = deduplicate_chunks((first, duplicate, distinct))
 
     assert unique == (first, distinct)
+
+
+def test_chunk_boundaries_advance_by_non_overlap_window() -> None:
+    content = " ".join(f"token-{index}" for index in range(35))
+    chunks = chunk_document(
+        _document(content),
+        ChunkingConfig(max_tokens=16, overlap_tokens=4),
+    )
+
+    assert [chunk.metadata["token_count"] for chunk in chunks] == [16, 16, 11]
+    assert [chunk.content.split()[0] for chunk in chunks] == [
+        "token-0",
+        "token-12",
+        "token-24",
+    ]
+    assert [chunk.content.split()[-1] for chunk in chunks] == [
+        "token-15",
+        "token-27",
+        "token-34",
+    ]

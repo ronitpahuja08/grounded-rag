@@ -1,6 +1,7 @@
 """Deterministic, provenance-preserving document chunking."""
 
 import re
+from collections.abc import Mapping
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -33,18 +34,43 @@ def chunk_document(
 ) -> tuple[Chunk, ...]:
     """Split a document into overlapping token windows with exact offsets."""
     active_config = config or ChunkingConfig()
-    tokens = tuple(_TOKEN.finditer(document.content))
+    chunks: list[Chunk] = []
+    for section_start, section_end, section_metadata in _section_ranges(document):
+        chunks.extend(
+            _chunk_range(
+                document,
+                active_config,
+                section_start,
+                section_end,
+                start_index=len(chunks),
+                section_metadata=section_metadata,
+            )
+        )
+    return tuple(chunks)
+
+
+def _chunk_range(
+    document: SourceDocument,
+    config: ChunkingConfig,
+    start: int,
+    end: int,
+    *,
+    start_index: int,
+    section_metadata: Mapping[str, str | int],
+) -> list[Chunk]:
+    tokens = tuple(_TOKEN.finditer(document.content, start, end))
     if not tokens:
-        return ()
+        return []
 
     chunks: list[Chunk] = []
-    step = active_config.max_tokens - active_config.overlap_tokens
-    for chunk_index, token_start in enumerate(range(0, len(tokens), step)):
-        window = tokens[token_start : token_start + active_config.max_tokens]
+    step = config.max_tokens - config.overlap_tokens
+    for local_index, token_start in enumerate(range(0, len(tokens), step)):
+        window = tokens[token_start : token_start + config.max_tokens]
         if not window:
             break
         start_char = window[0].start()
         end_char = window[-1].end()
+        chunk_index = start_index + local_index
         chunks.append(
             Chunk(
                 id=f"{document.id}:chunk-{chunk_index}",
@@ -53,9 +79,63 @@ def chunk_document(
                 index=chunk_index,
                 start_char=start_char,
                 end_char=end_char,
-                metadata={**document.metadata, "token_count": len(window)},
+                metadata={
+                    **document.metadata,
+                    **section_metadata,
+                    "token_count": len(window),
+                },
             )
         )
-        if token_start + active_config.max_tokens >= len(tokens):
+        if token_start + config.max_tokens >= len(tokens):
             break
-    return tuple(chunks)
+    return chunks
+
+
+def _section_ranges(
+    document: SourceDocument,
+) -> tuple[tuple[int, int, Mapping[str, str | int]], ...]:
+    """Return Markdown section spans or one span for other media types."""
+    if document.media_type != "text/markdown":
+        return ((0, len(document.content), {}),)
+
+    raw_headings = document.metadata.get("headings")
+    if not isinstance(raw_headings, list):
+        return ((0, len(document.content), {}),)
+
+    lines = document.content.splitlines(keepends=True)
+    line_starts: list[int] = []
+    offset = 0
+    for line in lines:
+        line_starts.append(offset)
+        offset += len(line)
+
+    headings: list[tuple[int, int, str]] = []
+    for raw_heading in raw_headings:
+        if not isinstance(raw_heading, dict):
+            continue
+        heading_line = raw_heading.get("line")
+        level = raw_heading.get("level")
+        text = raw_heading.get("text")
+        if (
+            isinstance(heading_line, int)
+            and 1 <= heading_line <= len(line_starts)
+            and isinstance(level, int)
+            and isinstance(text, str)
+        ):
+            headings.append((line_starts[heading_line - 1], level, text))
+
+    if not headings:
+        return ((0, len(document.content), {}),)
+
+    ranges: list[tuple[int, int, Mapping[str, str | int]]] = []
+    first_start = headings[0][0]
+    if document.content[:first_start].strip():
+        ranges.append((0, first_start, {}))
+    for index, (start, level, text) in enumerate(headings):
+        end = (
+            headings[index + 1][0]
+            if index + 1 < len(headings)
+            else len(document.content)
+        )
+        ranges.append((start, end, {"heading": text, "heading_level": level}))
+    return tuple(ranges)

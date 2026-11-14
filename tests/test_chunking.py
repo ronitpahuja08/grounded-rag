@@ -60,3 +60,39 @@ def test_chunk_document_keeps_offsets_aligned_with_original_content() -> None:
     assert chunk.content == "first\n\nsecond   third"
     assert document.content[chunk.start_char : chunk.end_char] == chunk.content
     assert chunk.metadata["source_hash"] == "abc123"
+
+
+def test_markdown_chunks_do_not_cross_heading_boundaries() -> None:
+    first_body = " ".join(["alpha"] * 18)
+    second_body = " ".join(["beta"] * 18)
+    content = f"# First\n\n{first_body}\n\n## Second\n\n{second_body}\n"
+    document = SourceDocument(
+        id="guide",
+        content=content,
+        source="guide.md",
+        media_type="text/markdown",
+        metadata={
+            "headings": [
+                {"level": 1, "line": 1, "text": "First"},
+                {"level": 2, "line": 5, "text": "Second"},
+            ]
+        },
+    )
+
+    chunks = chunk_document(
+        document,
+        ChunkingConfig(max_tokens=16, overlap_tokens=0),
+    )
+
+    assert len(chunks) == 4
+    assert all(
+        not ({"alpha", "beta"} <= set(chunk.content.split()))
+        for chunk in chunks
+    )
+    assert [chunk.metadata["heading"] for chunk in chunks] == [
+        "First",
+        "First",
+        "Second",
+        "Second",
+    ]
+    assert [chunk.index for chunk in chunks] == [0, 1, 2, 3]

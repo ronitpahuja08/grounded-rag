@@ -81,6 +81,9 @@ def _chunk_range(
                 end_char=end_char,
                 metadata={
                     **document.metadata,
+                    "source": document.source,
+                    "media_type": document.media_type,
+                    **({"title": document.title} if document.title else {}),
                     **section_metadata,
                     "token_count": len(window),
                 },

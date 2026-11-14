@@ -96,3 +96,26 @@ def test_markdown_chunks_do_not_cross_heading_boundaries() -> None:
         "Second",
     ]
     assert [chunk.index for chunk in chunks] == [0, 1, 2, 3]
+
+
+def test_pdf_chunks_retain_page_and_source_provenance() -> None:
+    document = SourceDocument(
+        id="pdf:guide:page-3",
+        content="Page-specific evidence remains traceable.",
+        source="documents/guide.pdf",
+        media_type="application/pdf",
+        title="Evidence Guide",
+        metadata={"page": 3, "page_count": 8, "source_hash": "pdf-hash"},
+    )
+
+    (chunk,) = chunk_document(document)
+
+    assert chunk.metadata == {
+        "page": 3,
+        "page_count": 8,
+        "source_hash": "pdf-hash",
+        "source": "documents/guide.pdf",
+        "media_type": "application/pdf",
+        "title": "Evidence Guide",
+        "token_count": 4,
+    }

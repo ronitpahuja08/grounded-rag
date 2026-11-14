@@ -6,6 +6,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from grounded_rag.hashing import hash_parts
 from grounded_rag.models import Chunk, SourceDocument
 
 _TOKEN = re.compile(r"\S+")
@@ -71,11 +72,18 @@ def _chunk_range(
         start_char = window[0].start()
         end_char = window[-1].end()
         chunk_index = start_index + local_index
+        content = document.content[start_char:end_char]
+        chunk_id = hash_parts(
+            document.id,
+            str(start_char),
+            str(end_char),
+            content,
+        )
         chunks.append(
             Chunk(
-                id=f"{document.id}:chunk-{chunk_index}",
+                id=f"chunk:{chunk_id[:40]}",
                 document_id=document.id,
-                content=document.content[start_char:end_char],
+                content=content,
                 index=chunk_index,
                 start_char=start_char,
                 end_char=end_char,

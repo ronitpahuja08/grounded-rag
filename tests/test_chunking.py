@@ -119,3 +119,20 @@ def test_pdf_chunks_retain_page_and_source_provenance() -> None:
         "title": "Evidence Guide",
         "token_count": 4,
     }
+
+
+def test_chunk_identifiers_are_deterministic_and_document_scoped() -> None:
+    config = ChunkingConfig(max_tokens=16, overlap_tokens=0)
+    original = _document("stable chunk content")
+    same_content_elsewhere = _document(
+        "stable chunk content",
+        document_id="other-guide",
+    )
+
+    first = chunk_document(original, config)
+    second = chunk_document(original, config)
+    other = chunk_document(same_content_elsewhere, config)
+
+    assert [chunk.id for chunk in first] == [chunk.id for chunk in second]
+    assert first[0].id.startswith("chunk:")
+    assert first[0].id != other[0].id

@@ -26,6 +26,12 @@ from grounded_rag.loaders import (
     TextLoader,
     UnsupportedSourceError,
 )
+from grounded_rag.manifest import (
+    CorpusManifest,
+    ManifestSource,
+    load_manifest,
+    save_manifest,
+)
 from grounded_rag.models import (
     Chunk,
     Citation,
@@ -52,6 +58,7 @@ __all__ = [
     "Chunk",
     "ChunkingConfig",
     "Citation",
+    "CorpusManifest",
     "DocumentLoader",
     "EmbeddingProvider",
     "EmbeddingVector",
@@ -60,6 +67,7 @@ __all__ = [
     "GroundedAnswer",
     "LoaderDispatchError",
     "LoaderRegistry",
+    "ManifestSource",
     "MarkdownLoader",
     "PdfLoader",
     "PdfLoadingError",
@@ -77,8 +85,10 @@ __all__ = [
     "hash_parts",
     "hash_text",
     "load_directory",
+    "load_manifest",
     "normalize_document_text",
     "normalize_text",
+    "save_manifest",
     "source_provenance",
 ]
 

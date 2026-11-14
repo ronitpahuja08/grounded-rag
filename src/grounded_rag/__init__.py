@@ -1,5 +1,6 @@
 """Grounded RAG public package."""
 
+from grounded_rag.chunking import ChunkingConfig
 from grounded_rag.discovery import (
     DEFAULT_IGNORED_PATHS,
     discover_sources,
@@ -45,6 +46,7 @@ __all__ = [
     "AppSettings",
     "BinarySourceError",
     "Chunk",
+    "ChunkingConfig",
     "Citation",
     "DocumentLoader",
     "EmbeddingProvider",

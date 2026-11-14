@@ -11,6 +11,7 @@ from grounded_rag.discovery import (
     load_directory,
 )
 from grounded_rag.hashing import hash_bytes, hash_parts, hash_text, normalize_text
+from grounded_rag.ingestion import IngestionResult, ingest_directory
 from grounded_rag.loaders import (
     AmbiguousLoaderError,
     BinarySourceError,
@@ -67,6 +68,7 @@ __all__ = [
     "EmptyLoaderResultError",
     "EmptyTextSourceError",
     "GroundedAnswer",
+    "IngestionResult",
     "LoaderDispatchError",
     "LoaderRegistry",
     "ManifestChanges",
@@ -88,6 +90,7 @@ __all__ = [
     "hash_bytes",
     "hash_parts",
     "hash_text",
+    "ingest_directory",
     "load_directory",
     "load_manifest",
     "normalize_document_text",

@@ -28,7 +28,9 @@ from grounded_rag.loaders import (
 )
 from grounded_rag.manifest import (
     CorpusManifest,
+    ManifestChanges,
     ManifestSource,
+    diff_manifests,
     load_manifest,
     save_manifest,
 )
@@ -67,6 +69,7 @@ __all__ = [
     "GroundedAnswer",
     "LoaderDispatchError",
     "LoaderRegistry",
+    "ManifestChanges",
     "ManifestSource",
     "MarkdownLoader",
     "PdfLoader",
@@ -80,6 +83,7 @@ __all__ = [
     "__version__",
     "chunk_document",
     "deduplicate_chunks",
+    "diff_manifests",
     "discover_sources",
     "hash_bytes",
     "hash_parts",

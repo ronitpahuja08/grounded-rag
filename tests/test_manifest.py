@@ -8,7 +8,9 @@ from pydantic import ValidationError
 
 from grounded_rag import (
     CorpusManifest,
+    ManifestChanges,
     ManifestSource,
+    diff_manifests,
     load_manifest,
     save_manifest,
 )
@@ -53,3 +55,44 @@ def test_manifest_rejects_malformed_hashes() -> None:
             document_ids=("guide",),
             chunk_ids=("chunk:guide",),
         )
+
+
+def test_manifest_diff_detects_added_changed_removed_and_unchanged() -> None:
+    generated_at = datetime(2026, 11, 14, 9, 0, tzinfo=UTC)
+    previous = CorpusManifest(
+        generated_at=generated_at,
+        sources=(
+            _source("changed.md"),
+            _source("removed.md"),
+            _source("stable.md"),
+        ),
+    )
+    current = CorpusManifest(
+        generated_at=generated_at,
+        sources=(
+            _source("added.md"),
+            _source("changed.md").model_copy(
+                update={"source_hash": "b" * 64}
+            ),
+            _source("stable.md"),
+        ),
+    )
+
+    changes = diff_manifests(previous, current)
+
+    assert changes == ManifestChanges(
+        added=("added.md",),
+        changed=("changed.md",),
+        removed=("removed.md",),
+        unchanged=("stable.md",),
+    )
+    assert changes.requires_update
+
+
+def test_first_manifest_marks_every_source_as_added() -> None:
+    current = CorpusManifest(
+        generated_at=datetime(2026, 11, 14, 9, 0, tzinfo=UTC),
+        sources=(_source("b.md"), _source("a.md")),
+    )
+
+    assert diff_manifests(None, current).added == ("a.md", "b.md")

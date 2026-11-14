@@ -1,6 +1,7 @@
 """Versioned corpus manifests with atomic JSON persistence."""
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
@@ -49,6 +50,55 @@ class CorpusManifest(BaseModel):
             msg = "manifest source locations must be unique"
             raise ValueError(msg)
         return self
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestChanges:
+    """Stable source-level differences between two corpus snapshots."""
+
+    added: tuple[str, ...] = ()
+    changed: tuple[str, ...] = ()
+    removed: tuple[str, ...] = ()
+    unchanged: tuple[str, ...] = ()
+
+    @property
+    def requires_update(self) -> bool:
+        """Return whether stored corpus state must be changed."""
+        return bool(self.added or self.changed or self.removed)
+
+
+def diff_manifests(
+    previous: CorpusManifest | None,
+    current: CorpusManifest,
+) -> ManifestChanges:
+    """Classify sources by location and exact source-content hash."""
+    previous_sources = () if previous is None else previous.sources
+    previous_by_source = {entry.source: entry for entry in previous_sources}
+    current_by_source = {entry.source: entry for entry in current.sources}
+    previous_names = set(previous_by_source)
+    current_names = set(current_by_source)
+    shared_names = previous_names & current_names
+
+    return ManifestChanges(
+        added=tuple(sorted(current_names - previous_names)),
+        changed=tuple(
+            sorted(
+                source
+                for source in shared_names
+                if previous_by_source[source].source_hash
+                != current_by_source[source].source_hash
+            )
+        ),
+        removed=tuple(sorted(previous_names - current_names)),
+        unchanged=tuple(
+            sorted(
+                source
+                for source in shared_names
+                if previous_by_source[source].source_hash
+                == current_by_source[source].source_hash
+            )
+        ),
+    )
 
 
 def save_manifest(manifest: CorpusManifest, destination: str | Path) -> None:

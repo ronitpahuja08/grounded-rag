@@ -3,7 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from grounded_rag import ChunkingConfig, SourceDocument, chunk_document
+from grounded_rag import (
+    ChunkingConfig,
+    SourceDocument,
+    chunk_document,
+    deduplicate_chunks,
+)
 
 
 def test_chunking_config_has_safe_defaults() -> None:
@@ -136,3 +141,17 @@ def test_chunk_identifiers_are_deterministic_and_document_scoped() -> None:
     assert [chunk.id for chunk in first] == [chunk.id for chunk in second]
     assert first[0].id.startswith("chunk:")
     assert first[0].id != other[0].id
+
+
+def test_duplicate_chunk_content_keeps_first_provenance() -> None:
+    config = ChunkingConfig(max_tokens=16, overlap_tokens=0)
+    first = chunk_document(_document("repeated evidence"), config)[0]
+    duplicate = chunk_document(
+        _document("repeated evidence", document_id="copy"),
+        config,
+    )[0]
+    distinct = chunk_document(_document("different evidence"), config)[0]
+
+    unique = deduplicate_chunks((first, duplicate, distinct))
+
+    assert unique == (first, distinct)

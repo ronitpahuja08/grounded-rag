@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from grounded_rag.hashing import hash_parts
+from grounded_rag.hashing import hash_parts, hash_text
 from grounded_rag.models import Chunk, SourceDocument
 
 _TOKEN = re.compile(r"\S+")
@@ -48,6 +48,19 @@ def chunk_document(
             )
         )
     return tuple(chunks)
+
+
+def deduplicate_chunks(chunks: tuple[Chunk, ...]) -> tuple[Chunk, ...]:
+    """Keep the first chunk for each normalized content digest."""
+    unique: list[Chunk] = []
+    seen_content: set[str] = set()
+    for chunk in chunks:
+        content_hash = hash_text(chunk.content)
+        if content_hash in seen_content:
+            continue
+        seen_content.add(content_hash)
+        unique.append(chunk)
+    return tuple(unique)
 
 
 def _chunk_range(

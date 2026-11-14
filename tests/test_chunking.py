@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from grounded_rag import ChunkingConfig
+from grounded_rag import ChunkingConfig, SourceDocument, chunk_document
 
 
 def test_chunking_config_has_safe_defaults() -> None:
@@ -23,3 +23,40 @@ def test_chunking_config_rejects_invalid_windows(
 ) -> None:
     with pytest.raises(ValidationError):
         ChunkingConfig(max_tokens=max_tokens, overlap_tokens=overlap_tokens)
+
+
+def _document(content: str, *, document_id: str = "guide") -> SourceDocument:
+    return SourceDocument(
+        id=document_id,
+        content=content,
+        source="guide.txt",
+        media_type="text/plain",
+        metadata={"source_hash": "abc123"},
+    )
+
+
+def test_chunk_document_builds_overlapping_token_windows() -> None:
+    content = " ".join(f"token-{index}" for index in range(40))
+    chunks = chunk_document(
+        _document(content),
+        ChunkingConfig(max_tokens=16, overlap_tokens=4),
+    )
+
+    assert [chunk.metadata["token_count"] for chunk in chunks] == [16, 16, 16]
+    assert chunks[0].content.split()[-4:] == chunks[1].content.split()[:4]
+    assert chunks[1].content.split()[-4:] == chunks[2].content.split()[:4]
+    assert chunks[0].start_char == 0
+    assert chunks[-1].end_char == len(content)
+
+
+def test_chunk_document_keeps_offsets_aligned_with_original_content() -> None:
+    document = _document("  first\n\nsecond   third  ")
+
+    (chunk,) = chunk_document(
+        document,
+        ChunkingConfig(max_tokens=16, overlap_tokens=0),
+    )
+
+    assert chunk.content == "first\n\nsecond   third"
+    assert document.content[chunk.start_char : chunk.end_char] == chunk.content
+    assert chunk.metadata["source_hash"] == "abc123"

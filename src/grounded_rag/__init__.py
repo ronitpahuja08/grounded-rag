@@ -1,6 +1,6 @@
 """Grounded RAG public package."""
 
-from grounded_rag.chunking import ChunkingConfig
+from grounded_rag.chunking import ChunkingConfig, chunk_document
 from grounded_rag.discovery import (
     DEFAULT_IGNORED_PATHS,
     discover_sources,
@@ -66,6 +66,7 @@ __all__ = [
     "TextLoader",
     "UnsupportedSourceError",
     "__version__",
+    "chunk_document",
     "discover_sources",
     "hash_bytes",
     "hash_parts",

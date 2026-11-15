@@ -24,3 +24,21 @@ def validate_vector(
         msg = f"{name} must contain only finite values"
         raise ValueError(msg)
     return values
+
+
+def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
+    """Return cosine similarity for non-zero vectors with matching widths."""
+    left_values = validate_vector(left, name="left vector")
+    right_values = validate_vector(
+        right,
+        dimensions=len(left_values),
+        name="right vector",
+    )
+    left_norm = math.sqrt(sum(value * value for value in left_values))
+    right_norm = math.sqrt(sum(value * value for value in right_values))
+    if left_norm == 0 or right_norm == 0:
+        msg = "cosine similarity is undefined for a zero vector"
+        raise ValueError(msg)
+    return sum(left_value * right_value for left_value, right_value in zip(left_values, right_values)) / (
+        left_norm * right_norm
+    )

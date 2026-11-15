@@ -44,6 +44,7 @@ RetrieverName = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
 ]
 AnswerStatus = Literal["grounded", "insufficient_evidence"]
+RetrievalMode = Literal["semantic", "lexical", "hybrid"]
 
 
 class SourceDocument(BaseModel):
@@ -90,6 +91,26 @@ class RetrievalHit(BaseModel):
     score: RetrievalScore
     rank: RetrievalRank
     retriever: RetrieverName = "vector"
+
+
+class RetrievalQuery(BaseModel):
+    """A validated retrieval request with an explicit search mode."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: NonEmptyText
+    mode: RetrievalMode = "hybrid"
+    limit: RetrievalRank = 5
+    source: SourceLocation | None = None
+
+
+class RetrievalResult(BaseModel):
+    """A query response that preserves ranked evidence and search mode."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query: RetrievalQuery
+    hits: tuple[RetrievalHit, ...] = ()
 
 
 class Citation(BaseModel):

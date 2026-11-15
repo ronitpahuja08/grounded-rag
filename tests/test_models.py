@@ -118,6 +118,14 @@ def test_retrieval_hit_rejects_non_positive_rank() -> None:
         RetrievalHit(chunk=make_chunk(), score=0.5, rank=0)
 
 
+def test_retrieval_query_and_result_preserve_search_contract() -> None:
+    from grounded_rag import RetrievalQuery, RetrievalResult
+
+    query = RetrievalQuery(text="What evidence is available?", mode="semantic", limit=3)
+
+    assert RetrievalResult(query=query).hits == ()
+
+
 def make_citation(index: int = 1) -> Citation:
     """Create a traceable citation for answer model tests."""
     return Citation(

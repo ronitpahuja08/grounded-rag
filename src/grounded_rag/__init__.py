@@ -40,6 +40,8 @@ from grounded_rag.models import (
     Citation,
     GroundedAnswer,
     RetrievalHit,
+    RetrievalQuery,
+    RetrievalResult,
     SourceDocument,
 )
 from grounded_rag.normalization import normalize_document_text
@@ -77,6 +79,8 @@ __all__ = [
     "PdfLoader",
     "PdfLoadingError",
     "RetrievalHit",
+    "RetrievalQuery",
+    "RetrievalResult",
     "SourceDocument",
     "SourceTooLargeError",
     "TextDecodingError",

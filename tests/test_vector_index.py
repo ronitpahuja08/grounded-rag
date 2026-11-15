@@ -1,5 +1,8 @@
 """Tests for deterministic vector indexing."""
 
+from pathlib import Path
+
+from grounded_rag.index_storage import load_vector_index, save_vector_index
 from grounded_rag.models import Chunk
 from grounded_rag.vector_index import InMemoryVectorIndex
 
@@ -39,3 +42,17 @@ def test_index_validates_search_and_removal_contracts() -> None:
         assert "expected 2" in str(error)
     else:
         raise AssertionError("mismatched query dimensions must fail")
+
+
+def test_vector_index_round_trips_atomically_with_chunk_metadata(
+    tmp_path: Path,
+) -> None:
+    index = InMemoryVectorIndex(dimensions=2)
+    index.upsert(make_chunk("chunk-a"), (1.0, 0.0))
+    destination = tmp_path / "index.json"
+
+    save_vector_index(index, destination)
+    loaded = load_vector_index(destination)
+
+    assert loaded.dimensions == 2
+    assert loaded.search((1.0, 0.0))[0].chunk.id == "chunk-a"

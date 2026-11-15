@@ -39,6 +39,8 @@ def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
     if left_norm == 0 or right_norm == 0:
         msg = "cosine similarity is undefined for a zero vector"
         raise ValueError(msg)
-    return sum(left_value * right_value for left_value, right_value in zip(left_values, right_values)) / (
-        left_norm * right_norm
+    dot_product = sum(
+        left_value * right_value
+        for left_value, right_value in zip(left_values, right_values, strict=True)
     )
+    return dot_product / (left_norm * right_norm)

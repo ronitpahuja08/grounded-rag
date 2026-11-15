@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
+from grounded_rag.embeddings import LocalHashEmbeddingProvider
 from grounded_rag.index_storage import load_vector_index, save_vector_index
+from grounded_rag.indexing import update_index
 from grounded_rag.models import Chunk
 from grounded_rag.vector_index import InMemoryVectorIndex
 
@@ -56,3 +58,29 @@ def test_vector_index_round_trips_atomically_with_chunk_metadata(
 
     assert loaded.dimensions == 2
     assert loaded.search((1.0, 0.0))[0].chunk.id == "chunk-a"
+
+
+def test_incremental_update_embeds_only_unknown_chunk_ids() -> None:
+    class RecordingEmbedder(LocalHashEmbeddingProvider):
+        def __init__(self) -> None:
+            super().__init__(dimensions=8)
+            self.calls: list[tuple[str, ...]] = []
+
+        def embed_documents(
+            self,
+            texts: tuple[str, ...],
+        ) -> tuple[tuple[float, ...], ...]:
+            self.calls.append(texts)
+            return tuple(super().embed_documents(texts))
+
+    index = InMemoryVectorIndex(dimensions=8)
+    provider = RecordingEmbedder()
+    first = make_chunk("chunk-a")
+    second = make_chunk("chunk-b")
+
+    assert update_index(index, (first,), provider).added == 1
+    update = update_index(index, (first, second), provider)
+
+    assert update.added == 1
+    assert update.retained == 1
+    assert provider.calls == [("Evidence content",), ("Evidence content",)]

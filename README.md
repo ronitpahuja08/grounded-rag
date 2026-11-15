@@ -104,7 +104,8 @@ in [docs/architecture.md](docs/architecture.md).
 
 ## Status
 
-Days 1–3 are complete: foundation, file ingestion, normalization, chunking, and
-incremental corpus lifecycle. Embeddings, retrieval, grounded generation,
-evaluation, API, and demo milestones remain documented in
+Days 1–4 are complete: foundation, file ingestion, normalization, chunking,
+incremental corpus lifecycle, offline and OpenAI-compatible embeddings, and a
+persisted local vector index. Retrieval, grounded generation, evaluation, API,
+and demo milestones remain documented in
 [ROADMAP.md](ROADMAP.md).

@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from grounded_rag.embeddings import LocalHashEmbeddingProvider
 from grounded_rag.index_storage import load_vector_index, save_vector_index
 from grounded_rag.indexing import update_index
@@ -84,3 +86,23 @@ def test_incremental_update_embeds_only_unknown_chunk_ids() -> None:
     assert update.added == 1
     assert update.retained == 1
     assert provider.calls == [("Evidence content",), ("Evidence content",)]
+
+
+def test_loading_corrupt_index_or_mismatched_embedder_fails_safely(
+    tmp_path: Path,
+) -> None:
+    corrupt = tmp_path / "corrupt.json"
+    corrupt.write_text(
+        '{"schema_version": 1, "dimensions": 2, "entries": "bad"}',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_vector_index(corrupt)
+
+    index = InMemoryVectorIndex(dimensions=2)
+    with pytest.raises(ValueError, match="dimensions must match"):
+        update_index(
+            index,
+            (make_chunk("chunk-a"),),
+            LocalHashEmbeddingProvider(dimensions=8),
+        )

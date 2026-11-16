@@ -1,5 +1,7 @@
 """Tests for semantic retrieval behavior."""
 
+import pytest
+
 from grounded_rag.embeddings import LocalHashEmbeddingProvider
 from grounded_rag.models import Chunk, RetrievalQuery
 from grounded_rag.retrieval import SemanticRetriever
@@ -39,3 +41,14 @@ def test_semantic_retriever_ranks_indexed_evidence_and_filters_source() -> None:
 
     assert result.hits[0].chunk.id == "chunk-1"
     assert [hit.chunk.id for hit in filtered.hits] == ["chunk-1"]
+
+
+def test_semantic_retriever_rejects_lexical_queries_and_dimension_mismatches() -> None:
+    provider = LocalHashEmbeddingProvider(dimensions=32)
+    index = InMemoryVectorIndex(dimensions=32)
+    retriever = SemanticRetriever(index, provider)
+
+    with pytest.raises(ValueError, match="semantic or hybrid"):
+        retriever.retrieve(RetrievalQuery(text="find evidence", mode="lexical"))
+    with pytest.raises(ValueError, match="dimensions must match"):
+        SemanticRetriever(InMemoryVectorIndex(dimensions=16), provider)

@@ -25,11 +25,16 @@ class SemanticRetriever:
             msg = "semantic retriever only supports semantic or hybrid query modes"
             raise ValueError(msg)
         query_vector = self._provider.embed_query(query.text)
-        hits = self._index.search(query_vector, limit=query.limit)
+        candidate_limit = self._index.size if query.source is not None else query.limit
+        hits = self._index.search(query_vector, limit=candidate_limit)
         if query.source is not None:
             hits = tuple(
                 hit
                 for hit in hits
                 if hit.chunk.metadata.get("source") == query.source
+            )
+            hits = tuple(
+                hit.model_copy(update={"rank": rank})
+                for rank, hit in enumerate(hits[: query.limit], start=1)
             )
         return RetrievalResult(query=query, hits=hits)

@@ -52,3 +52,21 @@ def test_semantic_retriever_rejects_lexical_queries_and_dimension_mismatches() -
         retriever.retrieve(RetrievalQuery(text="find evidence", mode="lexical"))
     with pytest.raises(ValueError, match="dimensions must match"):
         SemanticRetriever(InMemoryVectorIndex(dimensions=16), provider)
+
+
+def test_source_filter_fills_the_requested_limit_and_re_ranks_hits() -> None:
+    provider = LocalHashEmbeddingProvider(dimensions=32)
+    index = InMemoryVectorIndex(dimensions=32)
+    chunks = (
+        make_chunk("unrelated", "retrieval evidence", "other.md"),
+        make_chunk("guide-one", "background context", "guide.md"),
+        make_chunk("guide-two", "source specific notes", "guide.md"),
+    )
+    for chunk in chunks:
+        index.upsert(chunk, provider.embed_query(chunk.content))
+    result = SemanticRetriever(index, provider).retrieve(
+        RetrievalQuery(text="retrieval evidence", source="guide.md", limit=2)
+    )
+
+    assert {hit.chunk.id for hit in result.hits} == {"guide-one", "guide-two"}
+    assert [hit.rank for hit in result.hits] == [1, 2]
